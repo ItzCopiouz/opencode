@@ -38,6 +38,16 @@ Everything else is additive: `packages/gateway-control/`, this file.
   ~40s (gateway router sync loop).
 - `POST /gateway/test {alias}` — run a tiny completion through the alias and
   report which backend served it (`x-litellm-model-api-base`).
+- `GET /gateway/scores` — Artificial Analysis composite scores per catalog
+  model (intelligence .5 / cost .3 / speed .2, `SWARM_SCORE_WEIGHTS` to tune;
+  Fireworks entries use Fireworks-hosted speed medians). Data via the official
+  AA API when `AA_API_KEY` is in the swarm .env, else parsed from the public
+  site (6h cache in ~/.cache/swarm-aa.json). The routing pickers rank by this.
+- `GET /gateway/jobs` / `POST /gateway/jobs {task, alias, n}` — read the shared
+  ledger; dispatch via the swarm repo's `bin/swarm run` (same path as the CLI).
+  `SWARM_TARGET_REPO` selects the repo the swarm works on.
+- `GET /gateway/credits` — the Component 5 table via `bin/credits --json`
+  (5min cache).
 
 ## Configuration
 

@@ -6,6 +6,8 @@ import { catalogs } from "./catalogs.js"
 import { swarmEnv } from "./env.js"
 import { listState, repointAlias, testAlias } from "./litellm.js"
 import { DASHBOARD_HTML } from "./dashboard.js"
+import { scores } from "./aa.js"
+import { readLedger, dispatch, credits } from "./swarm.js"
 
 export type GatewayRequest = { method: string; url: string; body?: string }
 export type GatewayResponse = { status: number; contentType: string; body: string }
@@ -39,6 +41,30 @@ export async function handle(req: GatewayRequest): Promise<GatewayResponse> {
       const { alias } = JSON.parse(req.body ?? "{}")
       if (!alias) return json(400, { error: "alias required" })
       return json(200, await testAlias(String(alias)))
+    }
+    if (req.method === "GET" && path === "/gateway/scores") {
+      const c = await catalogs()
+      return json(
+        200,
+        await scores({
+          azure: c.azure,
+          fireworks: c.fireworks,
+          proxy: c.proxy,
+          vertex: c.vertex,
+          bedrock: c.bedrock,
+        }),
+      )
+    }
+    if (req.method === "GET" && path === "/gateway/jobs") {
+      return json(200, readLedger())
+    }
+    if (req.method === "POST" && path === "/gateway/jobs") {
+      const { task, alias, n } = JSON.parse(req.body ?? "{}")
+      if (!task) return json(400, { error: "task required" })
+      return json(200, dispatch(String(task), String(alias ?? "grunt"), Number(n ?? 1)))
+    }
+    if (req.method === "GET" && path === "/gateway/credits") {
+      return json(200, await credits())
     }
     return json(404, { error: "not found" })
   } catch (e) {
