@@ -3,6 +3,7 @@ import { HttpApiBuilder, OpenApi } from "effect/unstable/httpapi"
 import { HttpClient, HttpMiddleware, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import { FSUtil } from "@opencode-ai/core/fs-util"
+import * as GatewayControl from "@opencode-ai/gateway-control" // FORK(swarm-control)
 import * as Observability from "@opencode-ai/core/observability"
 import { Account } from "@/account/account"
 import { Agent } from "@/agent/agent"
@@ -202,6 +203,24 @@ const uiRoute = HttpRouter.use((router) =>
   }),
 ).pipe(Layer.provide(authOnlyRouterLayer))
 
+// FORK(swarm-control): /gateway/* — swarm routing dashboard + admin API.
+// All logic lives in @opencode-ai/gateway-control; this is glue only.
+const gatewayRoute = HttpRouter.use((router) =>
+  router.add("*", "/gateway/*", (request) =>
+    Effect.gen(function* () {
+      const body =
+        request.method === "GET" || request.method === "HEAD" ? undefined : yield* Effect.orDie(request.text)
+      const result = yield* Effect.promise(() =>
+        GatewayControl.handle({ method: request.method, url: request.url, body }),
+      )
+      return HttpServerResponse.text(result.body, {
+        status: result.status,
+        headers: { "content-type": result.contentType },
+      })
+    }),
+  ),
+).pipe(Layer.provide(authOnlyRouterLayer))
+
 type RouteRequirements =
   | HttpRouter.HttpRouter
   | HttpRouter.Request<"Error", unknown>
@@ -280,6 +299,7 @@ export function createRoutes(
     instanceRoutes,
     serverRoutes,
     docRoute,
+    gatewayRoute, // FORK(swarm-control): must precede uiRoute's /* catch-all
     uiRoute,
   ).pipe(
     Layer.provide([

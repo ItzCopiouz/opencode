@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode-ai/gateway-control",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "google-auth-library": "10.5.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

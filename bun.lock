@@ -507,6 +507,16 @@
         "typescript": "catalog:",
       },
     },
+    "packages/gateway-control": {
+      "name": "@opencode-ai/gateway-control",
+      "version": "0.0.1",
+      "dependencies": {
+        "google-auth-library": "10.5.0",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+      },
+    },
     "packages/http-recorder": {
       "name": "@opencode-ai/http-recorder",
       "version": "1.18.9",
@@ -597,6 +607,7 @@
         "@octokit/rest": "catalog:",
         "@openauthjs/openauth": "catalog:",
         "@opencode-ai/codemode": "workspace:*",
+        "@opencode-ai/gateway-control": "workspace:*",
         "@opencode-ai/llm": "workspace:*",
         "@opencode-ai/plugin": "workspace:*",
         "@opencode-ai/protocol": "workspace:*",
@@ -1976,6 +1987,8 @@
     "@opencode-ai/enterprise": ["@opencode-ai/enterprise@workspace:packages/enterprise"],
 
     "@opencode-ai/function": ["@opencode-ai/function@workspace:packages/function"],
+
+    "@opencode-ai/gateway-control": ["@opencode-ai/gateway-control@workspace:packages/gateway-control"],
 
     "@opencode-ai/http-recorder": ["@opencode-ai/http-recorder@workspace:packages/http-recorder"],
 
