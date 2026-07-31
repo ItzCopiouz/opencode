@@ -25,6 +25,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .badge.azure { border-color:#2e6bd6; color:#7fa8f0; } .badge.fireworks { border-color:#c2571f; color:#f0a06e; }
   .badge.vertex { border-color:#2e9e5b; color:#7fd6a4; } .badge.proxy { border-color:#8b5cf6; color:#c1a6fa; }
   .badge.bedrock { border-color:#d6a02e; color:#f0d07f; }
+  .badge.anthropic { border-color:#c96442; color:#e8a68c; } .badge.chatgpt { border-color:#10a37f; color:#6fd4b8; }
   .model { color:#a9a9b6; font-size:13px; word-break:break-all; margin-top:2px; }
   select, button, textarea, input { font:inherit; border-radius:8px; border:1px solid #3a3a46; background:#22222b; color:#e6e6ea; padding:8px 10px; }
   select, textarea, input { width:100%; margin-top:10px; }
@@ -59,7 +60,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <script>
 const $ = (s, el=document) => el.querySelector(s);
 let CATALOGS = null, SCORES = {};
-const PROVIDERS = ["azure","fireworks","proxy","vertex","bedrock"];
+const PROVIDERS = ["anthropic","azure","fireworks","proxy","chatgpt","vertex","bedrock"];
 
 async function j(url, opts) {
   const r = await fetch(url, opts);
@@ -187,7 +188,7 @@ async function loadJobs() {
   const wrap = $("#tab-jobs");
   wrap.innerHTML = '<div class="card"><div class="alias">Dispatch background job</div>' +
     '<textarea id="task" rows="3" placeholder="task, e.g. add docstrings to every function in lib/"></textarea>' +
-    '<div class="row"><select id="jalias" style="flex:1"><option>grunt</option><option>build</option><option>review</option><option>cheap</option></select>' +
+    '<div class="row"><select id="jalias" style="flex:1"><option>grunt</option><option>iterate</option><option>plan</option><option>review</option><option>cheap</option></select>' +
     '<input id="jn" type="number" value="1" min="1" max="8" style="width:80px"></div>' +
     '<div class="actions"><button class="primary" id="go">Dispatch</button></div>' +
     '<div class="note" id="jnote"></div></div>' +

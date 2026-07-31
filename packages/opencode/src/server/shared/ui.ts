@@ -45,7 +45,36 @@ export function embeddedUI(disableEmbeddedWebUi: boolean) {
   if (disableEmbeddedWebUi) return Promise.resolve(null)
   return (embeddedUIPromise ??=
     // @ts-expect-error - generated file at build time
-    import("opencode-web-ui.gen.ts").then((module) => module.default as Record<string, string>).catch(() => null))
+    import("opencode-web-ui.gen.ts")
+      .then((module) => (module?.default ?? null) as Record<string, string> | null)
+      .catch(() => null)
+      .then((map) => (map && Object.keys(map).length ? map : distDirUI())))
+}
+
+// FORK(swarm-control): outside release binaries the gen module doesn't exist
+// and the server proxies app.opencode.ai — which can never include fork UI
+// changes. OPENCODE_WEB_UI_DIST points at a locally built packages/app/dist
+// and serves it through the same embedded-map path (values are file paths).
+async function distDirUI(): Promise<Record<string, string> | null> {
+  const dist = process.env["OPENCODE_WEB_UI_DIST"]
+  if (!dist) return null
+  const { readdirSync, statSync } = await import("node:fs")
+  const { join } = await import("node:path")
+  const map: Record<string, string> = {}
+  const walk = (dir: string, prefix: string) => {
+    for (const name of readdirSync(dir)) {
+      const abs = join(dir, name)
+      const rel = prefix ? `${prefix}/${name}` : name
+      if (statSync(abs).isDirectory()) walk(abs, rel)
+      else if (!name.endsWith(".map")) map[rel] = abs
+    }
+  }
+  try {
+    walk(dist, "")
+    return map["index.html"] ? map : null
+  } catch {
+    return null
+  }
 }
 
 function notFound() {

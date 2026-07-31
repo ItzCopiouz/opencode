@@ -11,6 +11,8 @@ export type Catalogs = {
   proxy: string[]
   vertex: string[]
   bedrock: string[]
+  anthropic: string[]
+  chatgpt: string[]
   errors: Record<string, string>
 }
 
@@ -74,7 +76,7 @@ export async function catalogs(): Promise<Catalogs> {
       return []
     }
   }
-  const [azure, fireworks, proxy, vertex] = await Promise.all([
+  const [azure, fireworks, proxy, vertex, anthropic, chatgpt] = await Promise.all([
     grab("azure", azureDeployments),
     grab("fireworks", async () => {
       if (!env.fireworksApiKey) throw new Error("no FIREWORKS_AI_API_KEY")
@@ -85,8 +87,22 @@ export async function catalogs(): Promise<Catalogs> {
       return openaiCompatibleModels(env.proxyBaseUrl, env.proxyApiKey)
     }),
     grab("vertex", vertexModels),
+    grab("anthropic", async () => {
+      if (!env.anthropicApiKey) throw new Error("no ANTHROPIC_API_KEY yet — roles fall back meanwhile")
+      const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+        headers: { "x-api-key": env.anthropicApiKey, "anthropic-version": "2023-06-01" },
+      })
+      if (!res.ok) throw new Error(`${res.status}`)
+      const data: any = await res.json()
+      return (data.data ?? []).map((m: any) => String(m.id))
+    }),
+    grab("chatgpt", async () => {
+      if (!env.openaiApiKey) throw new Error("no OPENAI_API_KEY yet")
+      const ids = await openaiCompatibleModels("https://api.openai.com/v1", env.openaiApiKey)
+      return ids.filter((id) => /^(gpt|o[0-9]|chatgpt)/.test(id)).sort()
+    }),
   ])
-  const data: Catalogs = { azure, fireworks, proxy, vertex, bedrock: [], errors }
+  const data: Catalogs = { azure, fireworks, proxy, vertex, bedrock: [], anthropic, chatgpt, errors }
   if (!errors["bedrock"]) errors["bedrock"] = "no AWS credentials configured yet"
   cache = { at: Date.now(), data }
   return data

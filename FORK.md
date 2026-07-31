@@ -21,8 +21,26 @@ tags; when a rebase conflicts, the conflict surface is the list below.
      `/*` catch-all, order matters)
 2. `packages/opencode/package.json`
    - dependency `"@opencode-ai/gateway-control": "workspace:*"`
+3. `packages/opencode/src/server/shared/ui.ts`
+   - `distDirUI()` fallback: `OPENCODE_WEB_UI_DIST` serves a locally built
+     `packages/app/dist` (outside release binaries the embedded map doesn't
+     exist and the server proxies app.opencode.ai, which can never contain
+     fork UI changes)
+4. `packages/app/src/app.tsx`
+   - import + `<Route path="/swarm">` (native swarm page)
+5. `packages/app/src/pages/home/home-projects-view.tsx`
+   - "Swarm" entry in the home sidebar nav
 
-Everything else is additive: `packages/gateway-control/`, this file.
+Everything else is additive: `packages/gateway-control/`,
+`packages/app/src/pages/swarm.tsx`, this file.
+
+## Native app page (/swarm)
+
+Role-tier cards (Planner / Power iterators / Reviewer / Middle / Low) with
+AA-score-ranked pickers; multi-deployment roles (e.g. `iterate`) get
+add-to-group / remove-deployment instead of whole-role re-point; Jobs
+dispatch + ledger; Credits. To serve it, build the app then run the server
+with `OPENCODE_WEB_UI_DIST=$PWD/packages/app/dist`.
 
 ## What it serves
 

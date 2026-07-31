@@ -4,7 +4,7 @@
 // response description, so the Effect-http glue in the server stays 10 lines.
 import { catalogs } from "./catalogs.js"
 import { swarmEnv } from "./env.js"
-import { listState, repointAlias, testAlias } from "./litellm.js"
+import { addDeployment, deleteDeployment, listState, repointAlias, testAlias } from "./litellm.js"
 import { DASHBOARD_HTML } from "./dashboard.js"
 import { scores } from "./aa.js"
 import { readLedger, dispatch, credits } from "./swarm.js"
@@ -52,8 +52,21 @@ export async function handle(req: GatewayRequest): Promise<GatewayResponse> {
           proxy: c.proxy,
           vertex: c.vertex,
           bedrock: c.bedrock,
+          anthropic: c.anthropic,
+          chatgpt: c.chatgpt,
         }),
       )
+    }
+    if (req.method === "POST" && path === "/gateway/deployment") {
+      const { alias, provider, model } = JSON.parse(req.body ?? "{}")
+      if (!alias || !provider || !model) return json(400, { error: "alias, provider, model required" })
+      return json(200, await addDeployment(String(alias), String(provider), String(model)))
+    }
+    if (req.method === "POST" && path === "/gateway/deployment/delete") {
+      const { id } = JSON.parse(req.body ?? "{}")
+      if (!id) return json(400, { error: "id required" })
+      await deleteDeployment(String(id))
+      return json(200, { deleted: id })
     }
     if (req.method === "GET" && path === "/gateway/jobs") {
       return json(200, readLedger())

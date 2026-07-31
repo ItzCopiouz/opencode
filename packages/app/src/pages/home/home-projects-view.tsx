@@ -162,6 +162,17 @@ export function HomeUtilityNav(props: {
 }) {
   return (
     <div class={`${props.class ?? ""} min-w-0 flex-col gap-1 pr-3`}>
+      {/* FORK(swarm-control): swarm control page */}
+      <HomeProjectNavButton
+        type="button"
+        class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"
+        onClick={() => {
+          window.location.href = "/swarm"
+        }}
+      >
+        <IconV2 name="branch" size="small" />
+        <span class={HOME_PROJECT_NAV_LABEL}>Swarm</span>
+      </HomeProjectNavButton>
       <HomeProjectNavButton
         type="button"
         class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"

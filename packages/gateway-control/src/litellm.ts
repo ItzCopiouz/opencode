@@ -46,12 +46,15 @@ export async function modelInfo(): Promise<ModelInfoEntry[]> {
   return data.data as ModelInfoEntry[]
 }
 
-export function providerOf(litellmModel: string): string {
+export function providerOf(litellmModel: string, apiBase?: unknown): string {
   if (litellmModel.startsWith("azure/")) return "azure"
   if (litellmModel.startsWith("fireworks_ai/")) return "fireworks"
   if (litellmModel.startsWith("vertex_ai/")) return "vertex"
   if (litellmModel.startsWith("bedrock/")) return "bedrock"
-  if (litellmModel.startsWith("openai/")) return "proxy"
+  if (litellmModel.startsWith("anthropic/")) return "anthropic"
+  // openai/ prefix serves both the untrusted proxy (custom api_base) and the
+  // real ChatGPT API (no api_base)
+  if (litellmModel.startsWith("openai/")) return apiBase ? "proxy" : "chatgpt"
   return "unknown"
 }
 
@@ -69,7 +72,7 @@ export async function listState(): Promise<{ aliases: AliasInfo[]; deployments: 
       aliases.push({
         name: e.model_name,
         id: e.model_info.id ?? "",
-        provider: providerOf(model),
+        provider: providerOf(model, e.litellm_params["api_base"]),
         model: shortModel(model),
       })
     } else {
@@ -113,6 +116,11 @@ export function paramsFor(provider: string, model: string): Record<string, strin
         aws_secret_access_key: "os.environ/AWS_SECRET_ACCESS_KEY",
         aws_region_name: "os.environ/AWS_REGION_NAME",
       }
+    case "anthropic":
+      // metered Anthropic API — never the Max plan (OAuth interactive-only)
+      return { model: `anthropic/${model}`, api_key: "os.environ/ANTHROPIC_API_KEY" }
+    case "chatgpt":
+      return { model: `openai/${model}`, api_key: "os.environ/OPENAI_API_KEY" }
     default:
       throw new Error(`unknown provider: ${provider}`)
   }
@@ -137,6 +145,31 @@ export async function repointAlias(alias: string, provider: string, model: strin
     }
   }
   return { newId }
+}
+
+// Group-aware ops for multi-deployment roles (e.g. `iterate` load-balancing
+// across several backends): add one deployment / remove one by id, without
+// touching siblings. repointAlias remains the whole-role replace.
+export async function addDeployment(alias: string, provider: string, model: string): Promise<{ id: string }> {
+  const id = `alias-${alias}-${Date.now().toString(36)}`
+  await admin("/model/new", {
+    method: "POST",
+    body: JSON.stringify({
+      model_name: alias,
+      model_info: { id },
+      litellm_params: paramsFor(provider, model),
+    }),
+  })
+  return { id }
+}
+
+export async function deleteDeployment(id: string): Promise<void> {
+  const entries = await modelInfo()
+  const entry = entries.find((e) => e.model_info?.id === id && e.model_info?.db_model)
+  if (!entry) throw new Error(`no DB deployment with id ${id}`)
+  const siblings = entries.filter((e) => e.model_name === entry.model_name && e.model_info?.db_model)
+  if (siblings.length <= 1) throw new Error(`refusing to delete the last deployment of role ${entry.model_name}`)
+  await admin("/model/delete", { method: "POST", body: JSON.stringify({ id }) })
 }
 
 export async function testAlias(alias: string): Promise<{ content: string; apiBase?: string; modelId?: string }> {

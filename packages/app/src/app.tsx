@@ -69,6 +69,7 @@ import { createSessionLineage } from "@/pages/session/session-lineage"
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
+import { SwarmPage } from "@/pages/swarm" // FORK(swarm-control)
 
 const NewSession = lazy(() => import("@/pages/new-session"))
 
@@ -633,6 +634,8 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
+      {/* FORK(swarm-control): native swarm control page */}
+      <Route path="/swarm" component={SwarmPage} />
     </>
   )
 }

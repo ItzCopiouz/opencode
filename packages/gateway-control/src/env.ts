@@ -13,7 +13,11 @@ export type SwarmEnv = {
   fireworksApiKey?: string
   vertexProject?: string
   googleCredentials?: string
+  anthropicApiKey?: string
+  openaiApiKey?: string
 }
+
+const real = (v: string | undefined) => (v && v !== "PLACEHOLDER" ? v : undefined)
 
 let cached: SwarmEnv | undefined
 
@@ -36,9 +40,11 @@ export function swarmEnv(): SwarmEnv {
     masterKey,
     proxyBaseUrl: vars["PROXY_BASE_URL"],
     proxyApiKey: vars["PROXY_API_KEY"],
-    fireworksApiKey: vars["FIREWORKS_AI_API_KEY"],
-    vertexProject: vars["VERTEXAI_PROJECT"],
-    googleCredentials: vars["GOOGLE_APPLICATION_CREDENTIALS"],
+    fireworksApiKey: real(vars["FIREWORKS_AI_API_KEY"]),
+    vertexProject: real(vars["VERTEXAI_PROJECT"]),
+    googleCredentials: real(vars["GOOGLE_APPLICATION_CREDENTIALS"]),
+    anthropicApiKey: real(vars["ANTHROPIC_API_KEY"]),
+    openaiApiKey: real(vars["OPENAI_API_KEY"]),
   }
   return cached
 }
