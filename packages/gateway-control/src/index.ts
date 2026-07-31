@@ -32,9 +32,9 @@ export async function handle(req: GatewayRequest): Promise<GatewayResponse> {
       return json(200, await catalogs())
     }
     if (req.method === "POST" && path === "/gateway/route") {
-      const { alias, provider, model } = JSON.parse(req.body ?? "{}")
+      const { alias, provider, model, effort, fast, weight } = JSON.parse(req.body ?? "{}")
       if (!alias || !provider || !model) return json(400, { error: "alias, provider, model required" })
-      const result = await repointAlias(String(alias), String(provider), String(model))
+      const result = await repointAlias(String(alias), String(provider), String(model), { effort, fast, weight })
       return json(200, result)
     }
     if (req.method === "POST" && path === "/gateway/test") {
@@ -58,9 +58,9 @@ export async function handle(req: GatewayRequest): Promise<GatewayResponse> {
       )
     }
     if (req.method === "POST" && path === "/gateway/deployment") {
-      const { alias, provider, model } = JSON.parse(req.body ?? "{}")
+      const { alias, provider, model, effort, fast, weight } = JSON.parse(req.body ?? "{}")
       if (!alias || !provider || !model) return json(400, { error: "alias, provider, model required" })
-      return json(200, await addDeployment(String(alias), String(provider), String(model)))
+      return json(200, await addDeployment(String(alias), String(provider), String(model), { effort, fast, weight }))
     }
     if (req.method === "POST" && path === "/gateway/deployment/delete") {
       const { id } = JSON.parse(req.body ?? "{}")

@@ -12,7 +12,23 @@ export type AliasInfo = {
   id: string
   provider: string
   model: string
+  effort?: string
+  fast?: boolean
+  weight?: number
 }
+
+// Per-deployment tuning options. Effort maps per provider (OpenAI-style
+// reasoning_effort vs Anthropic output_config.effort); fast is the Anthropic
+// fast-mode research preview (Claude Opus 5 / Opus 4.8, Claude API only,
+// $10/$50 per MTok — speed:"fast" + beta flag fast-mode-2026-02-01).
+export type DeployOpts = {
+  effort?: string // low | medium | high | xhigh | max
+  fast?: boolean
+  weight?: number // load-balancing weight within a role group (simple-shuffle)
+}
+
+export const EFFORT_PROVIDERS = new Set(["anthropic", "azure", "proxy", "chatgpt"])
+export const FAST_MODELS = new Set(["claude-opus-5", "claude-opus-4-8"])
 
 export type DeploymentInfo = {
   name: string
@@ -69,11 +85,15 @@ export async function listState(): Promise<{ aliases: AliasInfo[]; deployments: 
   for (const e of entries) {
     const model = e.litellm_params.model ?? ""
     if (e.model_info?.db_model) {
+      const p = e.litellm_params as Record<string, any>
       aliases.push({
         name: e.model_name,
         id: e.model_info.id ?? "",
         provider: providerOf(model, e.litellm_params["api_base"]),
         model: shortModel(model),
+        effort: p["reasoning_effort"] ?? p["extra_body"]?.["output_config"]?.["effort"],
+        fast: p["extra_body"]?.["speed"] === "fast" || undefined,
+        weight: typeof p["weight"] === "number" ? p["weight"] : undefined,
       })
     } else {
       deployments.push({ name: e.model_name, id: e.model_info?.id, model, dbModel: false })
@@ -86,7 +106,25 @@ export async function listState(): Promise<{ aliases: AliasInfo[]; deployments: 
 // litellm_params for a given provider/model pair. Credentials are os.environ/
 // REFERENCES resolved inside the gateway process — raw secrets never enter
 // the gateway DB or cross this API.
-export function paramsFor(provider: string, model: string): Record<string, string> {
+export function paramsFor(provider: string, model: string, opts?: DeployOpts): Record<string, unknown> {
+  const base = baseParamsFor(provider, model)
+  if (opts?.weight != null && opts.weight > 0) base["weight"] = opts.weight
+  if (opts?.effort && EFFORT_PROVIDERS.has(provider)) {
+    if (provider === "anthropic") {
+      // Anthropic: effort lives in output_config (thinking is adaptive/on)
+      base["extra_body"] = { ...(base["extra_body"] as object), output_config: { effort: opts.effort } }
+    } else {
+      base["reasoning_effort"] = opts.effort
+    }
+  }
+  if (opts?.fast && provider === "anthropic" && FAST_MODELS.has(model)) {
+    base["extra_body"] = { ...(base["extra_body"] as object), speed: "fast" }
+    base["extra_headers"] = { "anthropic-beta": "fast-mode-2026-02-01" }
+  }
+  return base
+}
+
+function baseParamsFor(provider: string, model: string): Record<string, unknown> {
   switch (provider) {
     case "azure":
       return {
@@ -126,7 +164,12 @@ export function paramsFor(provider: string, model: string): Record<string, strin
   }
 }
 
-export async function repointAlias(alias: string, provider: string, model: string): Promise<{ newId: string }> {
+export async function repointAlias(
+  alias: string,
+  provider: string,
+  model: string,
+  opts?: DeployOpts,
+): Promise<{ newId: string }> {
   const entries = await modelInfo()
   const current = entries.filter((e) => e.model_name === alias && e.model_info?.db_model)
   if (current.length === 0) throw new Error(`alias not found (or not a DB model): ${alias}`)
@@ -136,7 +179,7 @@ export async function repointAlias(alias: string, provider: string, model: strin
     body: JSON.stringify({
       model_name: alias,
       model_info: { id: newId },
-      litellm_params: paramsFor(provider, model),
+      litellm_params: paramsFor(provider, model, opts),
     }),
   })
   for (const old of current) {
@@ -150,14 +193,19 @@ export async function repointAlias(alias: string, provider: string, model: strin
 // Group-aware ops for multi-deployment roles (e.g. `iterate` load-balancing
 // across several backends): add one deployment / remove one by id, without
 // touching siblings. repointAlias remains the whole-role replace.
-export async function addDeployment(alias: string, provider: string, model: string): Promise<{ id: string }> {
+export async function addDeployment(
+  alias: string,
+  provider: string,
+  model: string,
+  opts?: DeployOpts,
+): Promise<{ id: string }> {
   const id = `alias-${alias}-${Date.now().toString(36)}`
   await admin("/model/new", {
     method: "POST",
     body: JSON.stringify({
       model_name: alias,
       model_info: { id },
-      litellm_params: paramsFor(provider, model),
+      litellm_params: paramsFor(provider, model, opts),
     }),
   })
   return { id }

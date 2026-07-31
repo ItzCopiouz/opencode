@@ -5,18 +5,32 @@
 import { createResource, createSignal, For, Show } from "solid-js"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 
-type Alias = { name: string; id: string; provider: string; model: string }
+type Alias = {
+  name: string
+  id: string
+  provider: string
+  model: string
+  effort?: string
+  fast?: boolean
+  weight?: number
+}
 type Score = { score?: number; speed?: number; price?: number }
 
 const TIERS: Record<string, { label: string; blurb: string }> = {
   plan: { label: "Planner", blurb: "smartest model — decomposition & strategy" },
-  iterate: { label: "Power iterators", blurb: "heavy implementation, load-balanced across the group" },
+  "plan-ultra": { label: "Planner · ultra", blurb: "GPT-5.6 Sol at max reasoning effort" },
+  iterate: { label: "Power iterators", blurb: "heavy implementation, weighted: Claude > Azure > Kimi" },
+  frontend: { label: "Frontend", blurb: "UI work — prioritizes Claude and Kimi" },
+  reasoning: { label: "Math / reasoning", blurb: "GPT-5.6 Sol" },
   review: { label: "Reviewer", blurb: "verify & critique — iterator tier, never degrades silently" },
   grunt: { label: "Middle tier", blurb: "smaller tasks, fast & cheap at volume" },
   cheap: { label: "Low tier", blurb: "throwaway calls" },
 }
-const TIER_ORDER = ["plan", "iterate", "review", "grunt", "cheap"]
+const TIER_ORDER = ["plan", "plan-ultra", "iterate", "frontend", "reasoning", "review", "grunt", "cheap"]
 const PROVIDERS = ["anthropic", "azure", "fireworks", "proxy", "chatgpt", "vertex", "bedrock"]
+const EFFORTS = ["", "low", "medium", "high", "xhigh", "max"]
+const EFFORT_PROVIDERS = new Set(["anthropic", "azure", "proxy", "chatgpt"])
+const FAST_MODELS = new Set(["claude-opus-5", "claude-opus-4-8"])
 
 async function j(url: string, opts?: RequestInit) {
   const r = await fetch(url, opts)
@@ -98,8 +112,14 @@ function RoleCard(props: {
   const [busy, setBusy] = createSignal(false)
   const [note, setNote] = createSignal("")
   const [selection, setSelection] = createSignal("")
+  const [effort, setEffort] = createSignal("")
+  const [fast, setFast] = createSignal(false)
   const tier = () => TIERS[props.name]
   const isGroup = () => props.deployments.length > 1
+  const selProvider = () => selection().split("|")[0] ?? ""
+  const selModel = () => selection().split("|")[1] ?? ""
+  const effortAllowed = () => EFFORT_PROVIDERS.has(selProvider())
+  const fastAllowed = () => selProvider() === "anthropic" && FAST_MODELS.has(selModel())
 
   const options = () => {
     const out: { value: string; label: string; group: string }[] = []
@@ -167,6 +187,15 @@ function RoleCard(props: {
                   <Show when={s.score != null}>
                     <span class="ml-2 text-xs text-v2-text-text-faint">score {s.score}</span>
                   </Show>
+                  <Show when={d.effort}>
+                    <span class={chip + " ml-2"}>effort {d.effort}</span>
+                  </Show>
+                  <Show when={d.fast}>
+                    <span class={chip + " ml-2"}>⚡ fast</span>
+                  </Show>
+                  <Show when={d.weight != null}>
+                    <span class={chip + " ml-2"}>w{d.weight}</span>
+                  </Show>
                 </span>
                 <Show when={isGroup()}>
                   <button
@@ -194,16 +223,50 @@ function RoleCard(props: {
       </ul>
 
       <div class="flex items-center gap-2">
-        <select class={selectCls} value={selection()} onChange={(e) => setSelection(e.currentTarget.value)}>
+        <select
+          class={selectCls + " min-w-0 flex-1"}
+          value={selection()}
+          onChange={(e) => setSelection(e.currentTarget.value)}
+        >
           <option value="">select model…</option>
           <For each={options()}>{(o) => <option value={o.value}>{`${o.group} · ${o.label}`}</option>}</For>
         </select>
+        <select
+          class="w-28 shrink-0 rounded-lg border border-v2-border-border-faint bg-v2-background-bg-raised px-2 py-1.5 text-sm text-v2-text-text-base disabled:opacity-50"
+          value={effort()}
+          disabled={!effortAllowed()}
+          title={effortAllowed() ? "reasoning effort" : "effort not supported for this provider"}
+          onChange={(e) => setEffort(e.currentTarget.value)}
+        >
+          <For each={EFFORTS}>{(lvl) => <option value={lvl}>{lvl === "" ? "effort" : lvl}</option>}</For>
+        </select>
+        <label
+          class={
+            "flex shrink-0 items-center gap-1 text-xs " +
+            (fastAllowed() ? "text-v2-text-text-base" : "text-v2-text-text-faint opacity-50")
+          }
+          title="Anthropic fast mode — Claude Opus 5 / Opus 4.8, Claude API only, premium pricing ($10/$50 per MTok)"
+        >
+          <input
+            type="checkbox"
+            checked={fast() && fastAllowed()}
+            disabled={!fastAllowed()}
+            onChange={(e) => setFast(e.currentTarget.checked)}
+          />
+          ⚡ fast
+        </label>
         <button
           class={btnPrimary + " shrink-0"}
           disabled={busy() || !selection()}
           onClick={() => {
             const [provider, model] = selection().split("|")
-            const body = JSON.stringify({ alias: props.name, provider, model })
+            const body = JSON.stringify({
+              alias: props.name,
+              provider,
+              model,
+              effort: effortAllowed() && effort() ? effort() : undefined,
+              fast: fastAllowed() && fast() ? true : undefined,
+            })
             act(
               () =>
                 j(isGroup() ? "/gateway/deployment" : "/gateway/route", {
@@ -259,7 +322,9 @@ function JobsSection(props: { jobs: any; onRefresh: () => void }) {
         />
         <div class="flex items-center gap-2">
           <select class={selectCls} value={alias()} onChange={(e) => setAlias(e.currentTarget.value)}>
-            <For each={["grunt", "iterate", "plan", "review", "cheap"]}>{(a) => <option value={a}>{a}</option>}</For>
+            <For each={["grunt", "iterate", "frontend", "reasoning", "plan", "plan-ultra", "review", "cheap"]}>
+              {(a) => <option value={a}>{a}</option>}
+            </For>
           </select>
           <input
             class={selectCls + " w-20"}
